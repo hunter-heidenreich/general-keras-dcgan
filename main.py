@@ -10,6 +10,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+### Key Parameters
+input_width, input_height = 28, 28
+output_width, output_height = 28, 28
+color_channels = 1
+
+epochs = 25
+learning_rate = 2e-4
+beta1_momentum = 0.5
+
+batch_size = 64
+
+###
+
+
 def create_generator():
     model = Sequential()
     model.add(Dense(128 * 7 * 7, input_dim=100, activation=LeakyReLU(0.2)))
@@ -25,7 +39,7 @@ def create_generator():
 
 def create_discriminator():
     model = Sequential()
-    model.add(Convolution2D(64, 5, 5, subsample=(2, 2), input_shape=(28, 28, 1), border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(Convolution2D(64, 5, 5, subsample=(2, 2), input_shape=(input_width, input_height, color_channels), border_mode='same', activation=LeakyReLU(0.2)))
     model.add(Dropout(0.3))
     model.add(Convolution2D(128, 5, 5, subsample=(2, 2), border_mode='same', activation=LeakyReLU(0.2)))
     model.add(Dropout(0.3))
@@ -35,19 +49,6 @@ def create_discriminator():
 
 
 def main():
-
-    ### Key Parameters
-    input_width, input_height = 28, 28
-    output_width, output_height = 28, 28
-    color_channels = 1
-
-    epochs = 25
-    learning_rate = 2e-4
-    beta1_momentum = 0.5
-
-    batch_size = 64
-
-    ###
 
     # (X_train, Y_train), (X_test, Y_test) = mnist.load_data()
     (X_train, _), (_, _) = mnist.load_data()
@@ -63,8 +64,8 @@ def main():
 
     discriminator = create_discriminator()
 
-    generator.compile(loss='binary_crossentropy', optimizer=Adam())
-    discriminator.compile(loss='binary_crossentropy', optimizer=Adam())
+    generator.compile(loss='binary_crossentropy', optimizer=Adam(lr=learning_rate, beta_1=beta1_momentum))
+    discriminator.compile(loss='binary_crossentropy', optimizer=Adam(lr=learning_rate, beta_1=beta1_momentum))
 
     discriminator.trainable = False
     ganInput = Input(shape=(100, ))
@@ -74,7 +75,7 @@ def main():
     x = generator(ganInput)
     ganOutput = discriminator(x)
     gan = Model(input=ganInput, output=ganOutput)
-    gan.compile(loss='binary_crossentropy', optimizer=Adam())
+    gan.compile(loss='binary_crossentropy', optimizer=Adam(lr=learning_rate, beta_1=beta1_momentum))
 
     def train(epoch=10, batch_size=128):
         batch_count = X_train.shape[0] // batch_size
@@ -107,17 +108,13 @@ def main():
                 discriminator.trainable = False
                 gan.train_on_batch(noise_input, y_generator)
 
-    #train(30, 128)
+    train(30, 128)
 
-    #generator.save_weights('gen_30_scaled_images.h5')
-    #discriminator.save_weights('dis_30_scaled_images.h5')
+    generator.save_weights('gen.h5')
+    discriminator.save_weights('dis.h5')
 
-    #train(20, 128)
-
-    #generator.save_weights('gen_50_scaled_images.h5')
-    #discriminator.save_weights('dis_50_scaled_images.h5')
-    generator.load_weights('gen_30_scaled_images.h5')
-    discriminator.load_weights('dis_30_scaled_images.h5')
+#    generator.load_weights('gen_30_scaled_images.h5')
+#    discriminator.load_weights('dis_30_scaled_images.h5')
 
     def plot_output():
         try_input = np.random.rand(100, 100)
