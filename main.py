@@ -9,11 +9,37 @@ from keras.layers.advanced_activations import LeakyReLU
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+def create_generator():
+    model = Sequential()
+    model.add(Dense(128 * 7 * 7, input_dim=100, activation=LeakyReLU(0.2)))
+    model.add(BatchNormalization())
+    model.add(Reshape(7, 7, 128))
+    model.add(UpSampling2D())
+    model.add(Convolution2D(64, 5, 5, border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(BatchNormalization())
+    model.add(UpSampling2D())
+    model.add(Convolution2D(1, 5, 5, border_mode='same', activation='tanh'))
+    return model
+
+
+def create_discriminator():
+    model = Sequential()
+    model.add(Convolution2D(64, 5, 5, subsample=(2, 2), input_shape=(28, 28, 1), border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(Dropout(0.3))
+    model.add(Convolution2D(128, 5, 5, subsample=(2, 2), border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(Dropout(0.3))
+    model.add(Flatten())
+    model.add(Dense(1, activation='sigmoid'))
+    return model
+
+
 def main():
 
-    # Key Parameters
+    ### Key Parameters
     input_width, input_height = 28, 28
     output_width, output_height = 28, 28
+    color_channels = 1
 
     epochs = 25
     learning_rate = 2e-4
@@ -21,11 +47,11 @@ def main():
 
     batch_size = 64
 
+    ###
 
-    (X_train, Y_train), (X_test, Y_test) = mnist.load_data()
+    # (X_train, Y_train), (X_test, Y_test) = mnist.load_data()
+    (X_train, _), (_, _) = mnist.load_data()
     X_train = X_train.reshape(X_train.shape[0], 28, 28, 1)
-    X_test = X_test.reshape(X_test.shape[0], 28, 28, 1)
-
     X_train = X_train.astype('float32')
 
     # Scaling the range of the image to [-1, 1]
@@ -33,31 +59,15 @@ def main():
     # and tanh restricts the weights in the range [-1, 1]
     X_train = (X_train - 127.5) / 127.5
 
-    generator = Sequential([
-        Dense(128*7*7, input_dim=100, activation=LeakyReLU(0.2)),
-        BatchNormalization(),
-        Reshape((7,7,128)),
-        UpSampling2D(),
-        Convolution2D(64, 5, 5, border_mode='same', activation=LeakyReLU(0.2)),
-        BatchNormalization(),
-        UpSampling2D(),
-        Convolution2D(1, 5, 5, border_mode='same', activation='tanh')
-    ])
+    generator = create_generator()
 
-    discriminator = Sequential([
-        Convolution2D(64, 5, 5, subsample=(2,2), input_shape=(28,28,1), border_mode='same', activation=LeakyReLU(0.2)),
-        Dropout(0.3),
-        Convolution2D(128, 5, 5, subsample=(2,2), border_mode='same', activation=LeakyReLU(0.2)),
-        Dropout(0.3),
-        Flatten(),
-        Dense(1, activation='sigmoid')
-    ])
+    discriminator = create_discriminator()
 
     generator.compile(loss='binary_crossentropy', optimizer=Adam())
     discriminator.compile(loss='binary_crossentropy', optimizer=Adam())
 
     discriminator.trainable = False
-    ganInput = Input(shape=(100,))
+    ganInput = Input(shape=(100, ))
     # getting the output of the generator
     # and then feeding it to the discriminator
     # new model = D(G(input))
@@ -101,6 +111,11 @@ def main():
 
     generator.save_weights('gen_30_scaled_images.h5')
     discriminator.save_weights('dis_30_scaled_images.h5')
+
+    rain(20, 128)
+
+    generator.save_weights('gen_50_scaled_images.h5')
+    discriminator.save_weights('dis_50_scaled_images.h5')
 
     def plot_output():
         try_input = np.random.rand(100, 100)
