@@ -14,7 +14,7 @@ def create_generator():
     model = Sequential()
     model.add(Dense(128 * 7 * 7, input_dim=100, activation=LeakyReLU(0.2)))
     model.add(BatchNormalization())
-    model.add(Reshape(7, 7, 128))
+    model.add(Reshape((7, 7, 128))
     model.add(UpSampling2D())
     model.add(Convolution2D(64, 5, 5, border_mode='same', activation=LeakyReLU(0.2)))
     model.add(BatchNormalization())
