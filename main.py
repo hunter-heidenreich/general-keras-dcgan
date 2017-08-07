@@ -107,15 +107,17 @@ def main():
                 discriminator.trainable = False
                 gan.train_on_batch(noise_input, y_generator)
 
-    train(30, 128)
+    #train(30, 128)
 
-    generator.save_weights('gen_30_scaled_images.h5')
-    discriminator.save_weights('dis_30_scaled_images.h5')
+    #generator.save_weights('gen_30_scaled_images.h5')
+    #discriminator.save_weights('dis_30_scaled_images.h5')
 
-    rain(20, 128)
+    #train(20, 128)
 
-    generator.save_weights('gen_50_scaled_images.h5')
-    discriminator.save_weights('dis_50_scaled_images.h5')
+    #generator.save_weights('gen_50_scaled_images.h5')
+    #discriminator.save_weights('dis_50_scaled_images.h5')
+    generator.load_weights('gen_30_scaled_images.h5')
+    discriminator.load_weights('dis_30_scaled_images.h5')
 
     def plot_output():
         try_input = np.random.rand(100, 100)
