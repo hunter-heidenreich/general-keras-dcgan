@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from keras.datasets import mnist
+from keras.datasets import mnist, cifar10
 from keras.models import Model, Sequential
 from keras.layers import *
 from keras.optimizers import Adam
@@ -9,11 +9,13 @@ from keras.layers.advanced_activations import LeakyReLU
 import numpy as np
 import matplotlib.pyplot as plt
 
+# MNIST - (28, 28, 1)
+# CIFAR10 - (32, 32, 3)
 
 ### Key Parameters
-input_width, input_height = 28, 28
-output_width, output_height = 28, 28
-color_channels = 1
+input_width, input_height = 32, 32
+output_width, output_height = 32, 32
+color_channels = 3
 
 epochs = 25
 learning_rate = 2e-4
@@ -51,8 +53,9 @@ def create_discriminator():
 def main():
 
     # (X_train, Y_train), (X_test, Y_test) = mnist.load_data()
-    (X_train, _), (_, _) = mnist.load_data()
-    X_train = X_train.reshape(X_train.shape[0], 28, 28, 1)
+    # (X_train, _), (_, _) = mnist.load_data()
+    (X_train, _), (_, _) = cifar10.load_data()
+    X_train = X_train.reshape(X_train.shape[0], input_width, input_height, color_channels)
     X_train = X_train.astype('float32')
 
     # Scaling the range of the image to [-1, 1]
@@ -108,7 +111,7 @@ def main():
                 discriminator.trainable = False
                 gan.train_on_batch(noise_input, y_generator)
 
-    train(30, 128)
+    train(epochs, batch_size)
 
     generator.save_weights('gen.h5')
     discriminator.save_weights('dis.h5')
@@ -122,8 +125,11 @@ def main():
 
         plt.figure(figsize=(10,10))
         for i in range(preds.shape[0]):
-            plt.subplot(10, 10, i+1)
-            plt.imshow(preds[i, :, :, 0], cmap='gray')
+            plt.subplot(10, 10, i + 1)
+            if(color_channels == 3):
+                plt.imshow(preds[i, :, :, 0], cmap='hsv')
+            else:
+                plt.imshow(preds[i, :, :, 0], cmap='gray')
             plt.axis('off')
 
         # tight_layout minimizes the overlap between 2 sub-plots
