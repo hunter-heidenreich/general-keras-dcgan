@@ -131,6 +131,7 @@ def main():
 
         # tight_layout minimizes the overlap between 2 sub-plots
         plt.tight_layout()
+        plt.show()
 
     plot_output()
 
