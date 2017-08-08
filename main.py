@@ -19,61 +19,68 @@ from glob import glob
 # CIFAR10 - (32, 32, 3)
 
 ### Key Parameters
+input_width, input_height = 28, 28
+output_width, output_height = 24, 24
+color_channels = 1
+dataset = 'mnist'
 '''
 input_width, input_height = 32, 32
 output_width, output_height = 32, 32
 color_channels = 3
-
-epochs = 100
-learning_rate = 2e-4
-beta1_momentum = 0.5
-
-batch_size = 64
-
-dataset = 'cifar10-'
+dataset = 'cifar10'
+'''
 '''
 input_width, input_height = 178, 218
 output_width, output_height = 64, 64
 color_channels = 3
-
+dataset = 'celebAas'
+'''
 epochs = 100
 learning_rate = 2e-4
 beta1_momentum = 0.5
 
 batch_size = 64
-
-dataset = 'celebA-'
-im_bound  = (1, 202594)
 ###
 
 
 def load_data():
-    if dataset == 'mnist-':
+    if dataset == 'mnist':
         return mnist.load_data()[0][0]
-    elif dataset == 'cifar10-':
+    elif dataset == 'cifar10':
         return cifar10.load_data()[0][0]
-    elif dataset == 'celebA-':
-        data = glob(os.path.join("./data", 'celebA', '*.jpg'))
+    elif dataset == 'celebA':
+        data = glob(os.path.join("./data", dataset, '*.jpg'))
         print(len(data))
         return data
     return None
 
 def create_generator():
     model = Sequential()
-    model.add(Dense(128 * (output_width // 4) * (output_height // 4), input_dim=100, activation=LeakyReLU(0.2)))
+
+    model.add(Dense(128 * (output_width // 8) * (output_height // 8), input_dim=100, activation=LeakyReLU(0.2)))
     model.add(BatchNormalization())
-    model.add(Reshape((output_width // 4, output_height // 4, 128)))
+    model.add(Reshape((output_width // 8, output_height // 8, 128)))
+
     model.add(UpSampling2D())
     model.add(Convolution2D(64, 5, 5, border_mode='same', activation=LeakyReLU(0.2)))
     model.add(BatchNormalization())
+
+    model.add(UpSampling2D())
+    model.add(Convolution2D(32, 5, 5, border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(BatchNormalization())
+
     model.add(UpSampling2D())
     model.add(Convolution2D(color_channels, 5, 5, border_mode='same', activation='tanh'))
+
     return model
 
 
 def create_discriminator():
     model = Sequential()
-    model.add(Convolution2D(64, 5, 5, subsample=(2, 2), input_shape=(output_width, output_height, color_channels), border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(Convolution2D(32, 5, 5, subsample=(2, 2), input_shape=(output_width, output_height, color_channels), border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(Dropout(0.3))
+
+    model.add(Convolution2D(64, 5, 5, subsample=(2, 2), border_mode='same', activation=LeakyReLU(0.2)))
     model.add(Dropout(0.3))
     model.add(Convolution2D(128, 5, 5, subsample=(2, 2), border_mode='same', activation=LeakyReLU(0.2)))
     model.add(Dropout(0.3))
@@ -86,9 +93,10 @@ def main():
 
     # (X_train, Y_train), (X_test, Y_test) = mnist.load_data()
     # (X_train, _), (_, _) = mnist.load_data()
-    if dataset == 'cifar10-' or dataset == 'mnist-':
+    if dataset == 'cifar10' or dataset == 'mnist':
         X_train = load_data()
-        X_train = X_train.reshape(X_train.shape[0], input_width, input_height, color_channels)
+        X_train = X_train.reshape(X_train.shape[0], input_width, input_width, color_channels)
+        X_train = X_train[:, :output_width, :output_height, :]
         X_train = X_train.astype('float32')
 
         # Scaling the range of the image to [-1, 1]
@@ -142,20 +150,20 @@ def main():
         cnt = str(epoch)
         while len(cnt) < 3:
             cnt = '0' + cnt
-        scipy.misc.imsave(name + cnt + '.png', image)
+        scipy.misc.imsave(name + '/' + cnt + '.png', image)
 
 
     def train(epoch=10, batch_size=128):
-        if dataset == 'cifar10-' or dataset == 'mnist-':
+        if dataset == 'cifar10' or dataset == 'mnist':
             batch_count = X_train.shape[0] // batch_size
         else:
-            data = glob(os.path.join("./data", 'celebA', '*.jpg'))
+            data = glob(os.path.join("./data", dataset, '*.jpg'))
             batch_count = len(data) // batch_size
 
         for i in range(epoch):
             print('Saved Epoch', i)
-            generator.save_weights(dataset + 'gen.h5')
-            discriminator.save_weights(dataset + 'dis.h5')
+            generator.save_weights(dataset + '_gen.h5')
+            discriminator.save_weights(dataset + '_dis.h5')
             plot_output(dataset, i)
             for j in tqdm(range(batch_count)):
                 # Input for the generator
@@ -163,7 +171,7 @@ def main():
 
                 # getting random images from X_train of size=batch_sizes
                 # these are the real images that will be fed to the discriminator
-                if dataset == 'cifar10-' or dataset == 'mnist-':
+                if dataset == 'cifar10' or dataset == 'mnist':
                     image_batch = X_train[np.random.randint(0, X_train.shape[0], size=batch_size)]
                 else:
                     batch_files = data[j * batch_size:(j + 1) * batch_size]
@@ -206,8 +214,8 @@ def main():
                 gan.train_on_batch(noise_input, y_generator)
 
     try:
-        generator.load_weights(dataset + 'gen.h5')
-        discriminator.load_weights(dataset + 'dis.h5')
+        generator.load_weights(dataset + '_gen.h5')
+        discriminator.load_weights(dataset + '_dis.h5')
     except:
         print('Whoops! Save not found.')
 
