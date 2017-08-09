@@ -19,25 +19,39 @@ from glob import glob
 # CIFAR10 - (32, 32, 3)
 
 ### Key Parameters
+
+'''
 input_width, input_height = 28, 28
 output_width, output_height = 24, 24
 color_channels = 1
 dataset = 'mnist'
 '''
+'''
 input_width, input_height = 32, 32
 output_width, output_height = 32, 32
 color_channels = 3
-dataset = 'cifar10'
+dataset = 'letters'
 '''
+
+input_width, input_height = 64, 64
+output_width, output_height = 64, 64
+color_channels = 3
+dataset = 'cifar10'
+
 '''
 input_width, input_height = 178, 218
 output_width, output_height = 64, 64
 color_channels = 3
-dataset = 'celebAas'
+dataset = 'celebA'
 '''
+
+
+epoch_cnt = 0
 epochs = 100
 learning_rate = 2e-4
 beta1_momentum = 0.5
+
+noise_size = 200
 
 batch_size = 64
 ###
@@ -47,9 +61,16 @@ def load_data():
     if dataset == 'mnist':
         return mnist.load_data()[0][0]
     elif dataset == 'cifar10':
-        return cifar10.load_data()[0][0]
+        data = cifar10.load_data()[0][0]
+        resized = [scipy.misc.imresize(d, (64, 64)) for d in data]
+        resized = np.array(resized).astype(np.float32)
+        return resized
     elif dataset == 'celebA':
         data = glob(os.path.join("./data", dataset, '*.jpg'))
+        print(len(data))
+        return data
+    elif dataset == 'letters':
+        data = glob(os.path.join("./data", dataset, '*.png'))
         print(len(data))
         return data
     return None
@@ -57,16 +78,16 @@ def load_data():
 def create_generator():
     model = Sequential()
 
-    model.add(Dense(128 * (output_width // 8) * (output_height // 8), input_dim=100, activation=LeakyReLU(0.2)))
+    model.add(Dense(256 * (output_width // 8) * (output_height // 8), input_dim=noise_size, activation=LeakyReLU(0.2)))
     model.add(BatchNormalization())
-    model.add(Reshape((output_width // 8, output_height // 8, 128)))
+    model.add(Reshape((output_width // 8, output_height // 8, 256)))
+
+    model.add(UpSampling2D())
+    model.add(Convolution2D(128, 5, 5, border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(BatchNormalization())
 
     model.add(UpSampling2D())
     model.add(Convolution2D(64, 5, 5, border_mode='same', activation=LeakyReLU(0.2)))
-    model.add(BatchNormalization())
-
-    model.add(UpSampling2D())
-    model.add(Convolution2D(32, 5, 5, border_mode='same', activation=LeakyReLU(0.2)))
     model.add(BatchNormalization())
 
     model.add(UpSampling2D())
@@ -112,7 +133,7 @@ def main():
     discriminator.compile(loss='binary_crossentropy', optimizer=Adam(lr=learning_rate, beta_1=beta1_momentum))
 
     discriminator.trainable = False
-    ganInput = Input(shape=(100, ))
+    ganInput = Input(shape=(noise_size, ))
     # getting the output of the generator
     # and then feeding it to the discriminator
     # new model = D(G(input))
@@ -125,6 +146,7 @@ def main():
 
         def merge(images, size):
             h, w = images.shape[1], images.shape[2]
+            print(h, w)
             if (images.shape[3] in (3,4)):
                 c = images.shape[3]
                 img = np.zeros((h * size[0], w * size[1], c))
@@ -144,10 +166,10 @@ def main():
                 raise ValueError('in merge(images,size) images parameter '
                                 'must have dimensions: HxW or HxWx3 or HxWx4')
 
-        try_input = np.random.rand(100, 100)
+        try_input = np.random.rand(100, noise_size)
         preds = generator.predict(try_input)
         image = np.squeeze(merge(preds, [10, 10]))
-        cnt = str(epoch)
+        cnt = str(epoch + epochs * epoch_cnt)
         while len(cnt) < 3:
             cnt = '0' + cnt
         scipy.misc.imsave(name + '/' + cnt + '.png', image)
@@ -157,7 +179,10 @@ def main():
         if dataset == 'cifar10' or dataset == 'mnist':
             batch_count = X_train.shape[0] // batch_size
         else:
-            data = glob(os.path.join("./data", dataset, '*.jpg'))
+            if dataset == 'celebA':
+                data = glob(os.path.join("./data", dataset, '*.jpg'))
+            elif dataset == 'letters':
+                data = glob(os.path.join("./data", dataset, '*.png'))
             batch_count = len(data) // batch_size
 
         for i in range(epoch):
@@ -167,7 +192,7 @@ def main():
             plot_output(dataset, i)
             for j in tqdm(range(batch_count)):
                 # Input for the generator
-                noise_input = np.random.rand(batch_size, 100)
+                noise_input = np.random.rand(batch_size, noise_size)
 
                 # getting random images from X_train of size=batch_sizes
                 # these are the real images that will be fed to the discriminator
@@ -208,7 +233,7 @@ def main():
                 discriminator.train_on_batch(X, y_discriminator)
 
                 # Let's train the generator
-                noise_input = np.random.rand(batch_size, 100)
+                noise_input = np.random.rand(batch_size, noise_size)
                 y_generator = [1]*batch_size
                 discriminator.trainable = False
                 gan.train_on_batch(noise_input, y_generator)
