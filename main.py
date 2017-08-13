@@ -20,24 +20,24 @@ from glob import glob
 
 ### Key Parameters
 
-'''
+
 input_width, input_height = 28, 28
-output_width, output_height = 24, 24
+output_width, output_height = 32, 32
 color_channels = 1
 dataset = 'mnist'
-'''
+
 '''
 input_width, input_height = 32, 32
 output_width, output_height = 32, 32
 color_channels = 3
 dataset = 'letters'
 '''
-
-input_width, input_height = 64, 64
-output_width, output_height = 64, 64
+'''
+input_width, input_height = 32, 32
+output_width, output_height = 32, 32
 color_channels = 3
 dataset = 'cifar10'
-
+'''
 '''
 input_width, input_height = 178, 218
 output_width, output_height = 64, 64
@@ -47,11 +47,11 @@ dataset = 'celebA'
 
 
 epoch_cnt = 0
-epochs = 100
+epochs = 400
 learning_rate = 2e-4
 beta1_momentum = 0.5
 
-noise_size = 200
+noise_size = 100
 
 batch_size = 64
 ###
@@ -59,12 +59,16 @@ batch_size = 64
 
 def load_data():
     if dataset == 'mnist':
-        return mnist.load_data()[0][0]
+        data = mnist.load_data()[0][0]
+        data = data.reshape(data.shape[0], input_width, input_height, color_channels)
+        new_data = np.zeros((data.shape[0], output_width, output_height, color_channels))
+        new_data[:, :input_width, :input_height, :] = data
+        return new_data
     elif dataset == 'cifar10':
         data = cifar10.load_data()[0][0]
-        resized = [scipy.misc.imresize(d, (64, 64)) for d in data]
-        resized = np.array(resized).astype(np.float32)
-        return resized
+        #resized = [scipy.misc.imresize(d, (64, 64)) for d in data]
+        #resized = np.array(resized).astype(np.float32)
+        return data
     elif dataset == 'celebA':
         data = glob(os.path.join("./data", dataset, '*.jpg'))
         print(len(data))
@@ -78,17 +82,23 @@ def load_data():
 def create_generator():
     model = Sequential()
 
-    model.add(Dense(256 * (output_width // 8) * (output_height // 8), input_dim=noise_size, activation=LeakyReLU(0.2)))
+    divisor = 4
+
+    model.add(Dense(256 * (output_width // divisor) * (output_height // divisor), input_dim=noise_size, activation=LeakyReLU(0.2)))
     model.add(BatchNormalization())
-    model.add(Reshape((output_width // 8, output_height // 8, 256)))
+    model.add(Reshape((output_width // divisor, output_height // divisor, 256)))
 
     model.add(UpSampling2D())
     model.add(Convolution2D(128, 5, 5, border_mode='same', activation=LeakyReLU(0.2)))
     model.add(BatchNormalization())
-
+    '''
     model.add(UpSampling2D())
     model.add(Convolution2D(64, 5, 5, border_mode='same', activation=LeakyReLU(0.2)))
     model.add(BatchNormalization())
+
+    model.add(UpSampling2D())
+    model.add(Convolution2D(32, 5, 5, border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(BatchNormalization())'''
 
     model.add(UpSampling2D())
     model.add(Convolution2D(color_channels, 5, 5, border_mode='same', activation='tanh'))
@@ -98,12 +108,15 @@ def create_generator():
 
 def create_discriminator():
     model = Sequential()
-    model.add(Convolution2D(32, 5, 5, subsample=(2, 2), input_shape=(output_width, output_height, color_channels), border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(Convolution2D(32, kernel_size=5, strides=5, input_shape=(output_width, output_height, color_channels), padding='same'))
+    model.add(LeakyReLU(0.2))
     model.add(Dropout(0.3))
 
-    model.add(Convolution2D(64, 5, 5, subsample=(2, 2), border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(Convolution2D(64, kernel_size=5, strides=5, padding='same'))
+    model.add(LeakyReLU(0.2))
     model.add(Dropout(0.3))
-    model.add(Convolution2D(128, 5, 5, subsample=(2, 2), border_mode='same', activation=LeakyReLU(0.2)))
+    model.add(Convolution2D(128, kernel_size=5, strides=5, padding='same'))
+    model.add(LeakyReLU(0.2))
     model.add(Dropout(0.3))
     model.add(Flatten())
     model.add(Dense(1, activation='sigmoid'))
@@ -114,7 +127,7 @@ def main():
 
     # (X_train, Y_train), (X_test, Y_test) = mnist.load_data()
     # (X_train, _), (_, _) = mnist.load_data()
-    if dataset == 'cifar10' or dataset == 'mnist':
+    if dataset == 'cifar10':
         X_train = load_data()
         X_train = X_train.reshape(X_train.shape[0], input_width, input_width, color_channels)
         X_train = X_train[:, :output_width, :output_height, :]
@@ -123,6 +136,9 @@ def main():
         # Scaling the range of the image to [-1, 1]
         # Because we are using tanh as the activation function in the last layer of the generator
         # and tanh restricts the weights in the range [-1, 1]
+        X_train = (X_train - 127.5) / 127.5
+    elif dataset == 'mnist':
+        X_train = load_data()
         X_train = (X_train - 127.5) / 127.5
 
     generator = create_generator()
@@ -146,7 +162,6 @@ def main():
 
         def merge(images, size):
             h, w = images.shape[1], images.shape[2]
-            print(h, w)
             if (images.shape[3] in (3,4)):
                 c = images.shape[3]
                 img = np.zeros((h * size[0], w * size[1], c))
@@ -175,7 +190,18 @@ def main():
         scipy.misc.imsave(name + '/' + cnt + '.png', image)
 
 
-    def train(epoch=10, batch_size=128):
+    def test():
+        for i in range(10):
+            train(1, batch_size, False)
+            try_input = np.random.rand(1, noise_size)
+            preds = generator.predict(try_input)
+            preds = preds.reshape(output_height, output_width, color_channels)
+            preds = np.array(preds).astype(np.float32)
+            image = scipy.misc.imresize(preds, [2 * output_height, 2 * output_width])
+            scipy.misc.imsave(dataset + '/output' + str(i) + '.png', image)
+
+
+    def train(epoch=10, batch_size=128, log_img=True):
         if dataset == 'cifar10' or dataset == 'mnist':
             batch_count = X_train.shape[0] // batch_size
         else:
@@ -186,10 +212,11 @@ def main():
             batch_count = len(data) // batch_size
 
         for i in range(epoch):
-            print('Saved Epoch', i)
-            generator.save_weights(dataset + '_gen.h5')
-            discriminator.save_weights(dataset + '_dis.h5')
-            plot_output(dataset, i)
+            if(log_img):
+                print('Saved Epoch', i)
+                generator.save_weights(dataset + '_gen.h5')
+                discriminator.save_weights(dataset + '_dis.h5')
+                plot_output(dataset, i)
             for j in tqdm(range(batch_count)):
                 # Input for the generator
                 noise_input = np.random.rand(batch_size, noise_size)
@@ -245,6 +272,7 @@ def main():
         print('Whoops! Save not found.')
 
     train(epochs, batch_size)
+    #test()
 
 
 if __name__ == '__main__':
