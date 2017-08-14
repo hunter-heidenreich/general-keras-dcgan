@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from keras.datasets import mnist, cifar10
 from keras.models import Model, Sequential
 from keras.layers import *
 from keras.optimizers import Adam
@@ -14,6 +13,7 @@ import scipy
 from scipy import ndimage, misc
 from glob import glob
 import datasets
+from optparse import OptionParser
 ### Key Parameters
 '''
 input_width, input_height = 28, 28
@@ -50,7 +50,7 @@ dataset = 'celebA'
 
 
 epoch_cnt = 1
-epochs = 4
+epochs = 16
 learning_rate = 2e-4
 beta1_momentum = 0.5
 
@@ -102,7 +102,6 @@ def create_discriminator():
 
 
 def main():
-
     generator = create_generator()
 
     discriminator = create_discriminator()
@@ -228,4 +227,15 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = OptionParser()
+    parser.add_option("-d", "--data", dest="data", default='cifar10', help="dataset to be used")
+    parser.add_option("-W", "--width", dest="width", default=32, help="width of images")
+    parser.add_option("-H", "--height", dest="height", default=32, help="height of images")
+    parser.add_option("-C", "--colors", dest="colors", default=3, help="# of color channels")
+    parser.add_option("-e", "--epochs", dest="epochs", default=100, help="# of epochs")
+    parser.add_option("-b", "--batch_size", dest="batch_size", default=64, help="size of batch")
+    parser.add_option("-t", "--test", dest="train", default=True, help="test or train")
+    (options, args) = parser.parse_args()
+    print(options)
+    print(args)
+    #main()
