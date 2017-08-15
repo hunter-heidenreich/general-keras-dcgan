@@ -33,30 +33,6 @@ output_width, output_height = 32, 32
 color_channels = 3
 dataset = 'cifar10'
 '''
-
-input_width, input_height = 218, 178
-output_width, output_height = input_width - (input_width % 4), input_height - (input_height % 4)
-resize = 0
-while output_width > 100 or output_height > 100:
-    output_width //= 2
-    output_width = output_width - (output_width % 4)
-    output_height //= 2
-    output_height = output_height - (output_height % 4)
-    resize += 1
-
-color_channels = 3
-dataset = 'celebA'
-
-
-
-epoch_cnt = 1
-epochs = 16
-learning_rate = 2e-4
-beta1_momentum = 0.5
-
-noise_size = 100
-
-batch_size = 64
 ###
 
 
@@ -101,7 +77,7 @@ def create_discriminator():
     return model
 
 
-def main():
+def main(is_train):
     generator = create_generator()
 
     discriminator = create_discriminator()
@@ -222,9 +198,22 @@ def main():
     except:
         print('Whoops! Save not found.')
 
-    train(epochs, batch_size)
-    #test()
+    if is_train == True:
+        train(epochs, batch_size)
+    else:
+        test()
 
+input_width, input_height = 218, 178
+output_width, output_height = input_width, input_height
+color_channels = 3
+dataset = 'celebA'
+epoch_cnt = 1
+epochs = 16
+learning_rate = 2e-4
+beta1_momentum = 0.5
+noise_size = 100
+
+batch_size = 64
 
 if __name__ == '__main__':
     parser = OptionParser()
@@ -236,6 +225,21 @@ if __name__ == '__main__':
     parser.add_option("-b", "--batch_size", dest="batch_size", default=64, help="size of batch")
     parser.add_option("-t", "--test", dest="train", default=True, help="test or train")
     (options, args) = parser.parse_args()
-    print(options)
-    print(args)
-    #main()
+
+    dataset = options.data
+    input_width = int(options.width)
+    input_height = int(options.height)
+    color_channels = int(options.colors)
+    epochs = int(options.epochs)
+    batch_size = int(options.batch_size)
+
+    output_width, output_height = input_width - (input_width % 4), input_height - (input_height % 4)
+    resize = 0
+    while output_width > 100 or output_height > 100:
+        output_width //= 2
+        output_width = output_width - (output_width % 4)
+        output_height //= 2
+        output_height = output_height - (output_height % 4)
+        resize += 1
+        
+    main(options.train)
