@@ -11,29 +11,10 @@ import cv2
 import os, re
 import scipy
 from scipy import ndimage, misc
+
 from glob import glob
 import datasets
 from optparse import OptionParser
-### Key Parameters
-'''
-input_width, input_height = 28, 28
-output_width, output_height = 32, 32
-color_channels = 1
-dataset = 'mnist'
-'''
-'''
-input_width, input_height = 32, 32
-output_width, output_height = 32, 32
-color_channels = 3
-dataset = 'letters'
-'''
-'''
-input_width, input_height = 32, 32
-output_width, output_height = 32, 32
-color_channels = 3
-dataset = 'cifar10'
-'''
-###
 
 
 def create_generator():
@@ -41,34 +22,34 @@ def create_generator():
 
     divisor = 4
 
-    model.add(Dense(256 * (output_width // divisor) * (output_height // divisor), input_dim=noise_size, activation=LeakyReLU(0.2)))
+    model.add(Dense(256 * (output_width // divisor) * (output_height // divisor), input_dim=noise_size))
     model.add(LeakyReLU(0.2))
     model.add(BatchNormalization())
     model.add(Reshape((output_width // divisor, output_height // divisor, 256)))
 
     model.add(UpSampling2D())
-    model.add(Convolution2D(128, 5, 5, border_mode='same'))
+    model.add(Conv2D(128, (5,5), padding='same'))
     model.add(LeakyReLU(0.2))
     model.add(BatchNormalization())
 
     model.add(UpSampling2D())
-    model.add(Convolution2D(color_channels, 5, 5, border_mode='same', activation='tanh'))
-
+    model.add(Conv2D(color_channels, (5,5), padding='same', activation='tanh'))
+    model.summary()
     return model
 
 
 def create_discriminator():
     model = Sequential()
 
-    model.add(Convolution2D(32, kernel_size=5, strides=5, input_shape=(output_width, output_height, color_channels), padding='same'))
+    model.add(Conv2D(32, (5,5), input_shape=(output_width, output_height, color_channels), padding='same'))
     model.add(LeakyReLU(0.2))
     model.add(Dropout(0.3))
 
-    model.add(Convolution2D(64, kernel_size=5, strides=5, padding='same'))
+    model.add(Conv2D(64,(5,5), padding='same'))
     model.add(LeakyReLU(0.2))
     model.add(Dropout(0.3))
 
-    model.add(Convolution2D(128, kernel_size=5, strides=5, padding='same'))
+    model.add(Conv2D(128, (5,5), padding='same'))
     model.add(LeakyReLU(0.2))
     model.add(Dropout(0.3))
 
@@ -79,19 +60,17 @@ def create_discriminator():
 
 def main(is_train):
     generator = create_generator()
-
     discriminator = create_discriminator()
 
     generator.compile(loss='binary_crossentropy', optimizer=Adam(lr=learning_rate, beta_1=beta1_momentum))
     discriminator.compile(loss='binary_crossentropy', optimizer=Adam(lr=learning_rate, beta_1=beta1_momentum))
 
     discriminator.trainable = False
+
     ganInput = Input(shape=(noise_size, ))
-    # getting the output of the generator
-    # and then feeding it to the discriminator
-    # new model = D(G(input))
-    x = generator(ganInput)
-    ganOutput = discriminator(x)
+    gen_in = generator(ganInput)
+    ganOutput = discriminator(gen_in)
+
     gan = Model(input=ganInput, output=ganOutput)
     gan.compile(loss='binary_crossentropy', optimizer=Adam(lr=learning_rate, beta_1=beta1_momentum))
 
@@ -140,15 +119,14 @@ def main(is_train):
 
 
     def train(epoch=10, batch_size=128, log_img=True):
-        if dataset == 'cifar10' or dataset == 'mnist':
-            data = datasets.get_data(dataset, (input_width, input_height), (output_width, output_height), color_channels)
-            batch_count = data.shape[0] // batch_size
+        data, batch_count = [], 0
+        if dataset == 'cifar10' or dataset == 'mnist' or dataset == 'cifar100' or dataset == 'o-faces':
+            data, batch_count = datasets.get_data(dataset, (input_width, input_height), (output_width, output_height), color_channels, batch_size)
         else:
             if dataset == 'celebA':
-                data = glob(os.path.join("./data", dataset + '_post', '*.jpg'))
+                data, batch_count = datasets.get_data(dataset, (input_width, input_height), (output_width, output_height), batch_size, color_channels)
             elif dataset == 'letters':
-                data = glob(os.path.join("./data", dataset, '*.png'))
-            batch_count = len(data) // batch_size
+                data, batch_count = datasets.get_data(dataset, (input_width, input_height), (output_width, output_height), batch_size, color_channels, file_ext='*.png')
 
         for i in range(epoch):
             if(log_img):
@@ -161,7 +139,7 @@ def main(is_train):
                 noise_input = np.random.rand(batch_size, noise_size)
 
 
-                if dataset == 'cifar10' or dataset == 'mnist':
+                if dataset == 'cifar10' or dataset == 'mnist' or dataset == 'o-faces' or dataset == 'cifar100':
                     image_batch = data[np.random.randint(0, data.shape[0], size=batch_size)]
                 else:
                     batch_files = data[j * batch_size:(j + 1) * batch_size]
@@ -241,5 +219,5 @@ if __name__ == '__main__':
         output_height //= 2
         output_height = output_height - (output_height % 4)
         resize += 1
-        
+
     main(options.train)
